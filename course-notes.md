@@ -360,7 +360,7 @@ Los DataFrames son similares a las tablas relacionales o DataFrames en Python / 
   ['id', 'name', 'dept', 'salary']
   ```
 
-- **dtypes**: Accede al datatype de columnas dentro del DataFrame.
+- **1s**: Accede al datatype de columnas dentro del DataFrame.
 
   ```python
   df.dtypes
@@ -551,7 +551,7 @@ only showing top 5 rows
 
 ## Columnas derivadas
 
-Podemos usar la función "withColumn" para derivar la columna en función de las columnas existentes...
+Podemos usar la función "**withColumn**" para derivar la columna en función de las columnas existentes...
 
 ```python
 df.withColumn("bonus", col("salary") * .1).show()
@@ -582,7 +582,7 @@ df.withColumn("bonus", col("salary") * .1).show()
 Por ejemplo:
 
 ```sql
-sqlCopy codeSELECT *
+SELECT *
 FROM tablaA
 LEFT JOIN tablaB
 ON tablaA.id = tablaB.id;
@@ -593,7 +593,7 @@ ON tablaA.id = tablaB.id;
 Por ejemplo:
 
 ```sql
-sqlCopy codeSELECT *
+SELECT *
 FROM tablaA
 RIGHT JOIN tablaB
 ON tablaA.id = tablaB.id;
@@ -604,7 +604,7 @@ ON tablaA.id = tablaB.id;
 Por ejemplo:
 
 ```sql
-sqlCopy codeSELECT *
+SELECT *
 FROM tablaA
 FULL OUTER JOIN tablaB
 ON tablaA.id = tablaB.id;
@@ -615,7 +615,7 @@ ON tablaA.id = tablaB.id;
 Por ejemplo:
 
 ```sql
-sqlCopy codeSELECT *
+SELECT *
 FROM tablaA
 INNER JOIN tablaB
 ON tablaA.id = tablaB.id;
@@ -626,7 +626,7 @@ ON tablaA.id = tablaB.id;
 Por ejemplo:
 
 ```sql
-sqlCopy codeSELECT *
+SELECT *
 FROM tablaA
 LEFT ANTI JOIN tablaB
 ON tablaA.id = tablaB.id;
@@ -637,7 +637,7 @@ ON tablaA.id = tablaB.id;
 Por ejemplo:
 
 ```sql
-sqlCopy codeSELECT *
+SELECT *
 FROM tablaA
 RIGHT ANTI JOIN tablaB
 ON tablaA.id = tablaB.id;
@@ -868,5 +868,1144 @@ relational_df.write.format('jdbc')\
 
 # Funciones avanzadas de Spark
 
+## Funciones avanzadas
 
+Spark contiene numerosas **funciones avanzadas** para optimizar su rendimiento y realizar transformaciones complejas en los datos. Algunas de ellas son: las expresiones de selectExpr(), UDF (User Defined Functions), cache, etc.
 
+![image-20230425154027191](assets/image-20230425154027191.png)
+
+## Optimización del rendimiento
+
+Una de las **técnicas de optimización** son los métodos **caché()** y **persist()**. Estos métodos se usan para **almacenar un calculo intermedio** de un RDD, DataFrame y Dataset para que puedan reutilizarse en acciones posteriores.
+
+![image-20230425154243045](assets/image-20230425154243045.png)
+
+En este caso, se realizan las transformaciones 1, 2 y 3 en dos ocasiones (para la acción 1 y para la acción 2).
+
+![image-20230425154246933](assets/image-20230425154246933.png)
+
+En este otro caso, se realizan las transformaciones 1, 2 y 3 una única vez, ya que que está utilizando el método **persist()** para persistir el resultado de la transformación 3.
+
+Cuando se persiste un DataFrame, cada nodo almacena sus datos particionados en la memoria y los reutiliza para aplicar otras transformaciones o acciones sobre ese DataFrame.
+
+Los datos persistidos de Spark en los nodos son tolerantes a fallos.
+
+- **establecer el tamaño de la tabla de broadcast**: 10 MB, podemos cambiar el umbral hasta 8GB.
+
+  - **¿Qué es una tabla de broadcast?**: Una tabla de difusión (broadcast table en inglés) es una forma eficiente de distribuir datos a lo largo de un clúster de Spark para que estén disponibles para su uso en las operaciones de transformación y análisis de datos.
+
+    Una tabla de difusión es una variable inmutable que se transmite desde el controlador de Spark a los nodos de trabajo del clúster, y se almacena en caché en cada nodo. Esto permite a cada nodo acceder a los datos de la tabla de difusión localmente, sin tener que transmitirlos repetidamente desde el controlador.
+
+    Las tablas de difusión se utilizan comúnmente en Spark para optimizar el rendimiento de operaciones que implican la combinación de grandes conjuntos de datos. Por ejemplo, si tenemos un conjunto de datos pequeño que necesitamos combinar con otro conjunto de datos mucho más grande, podemos crear una tabla de difusión a partir del conjunto de datos pequeño y difundirla en todo el clúster de Spark. Luego, podemos unir el conjunto de datos más grande con la tabla de difusión en cada nodo de trabajo, lo que reduce significativamente el tiempo necesario para realizar la operación de unión.
+
+  ```python
+  size = int(spark.conf.get("spark.sql.autoBroadcastJoinThreshold")[:-1]) / (1024 * 1024)
+  print("Default size of broadcast table is {0} MB.".format(size))
+  
+  spark.conf.set("spark.sql.autoBroadcastJoinThreshold", 50 * 1024 * 1024)
+  
+  # Out
+  Default size of broadcast table is 10.0 MB.
+  ```
+
+- **join**: unir 2 DataFrames.
+
+  ```python
+  join_df = big_df.join(broadcast(small_df), big_df["id"] == small_df["id"])
+  ```
+
+- **cache**: para mantener el marco de datos en la memoria y mejorar significativamente el rendimiento de Spark si almacenamos los datos que utilizamos con mucha frecuencia.
+
+  ```python
+  df.cache()
+  df.count()
+  print("Memory Used : {0}".format(df.storageLevel.useMemory))
+  print("Disk Used : {0}".format(df.storageLevel.useDisk))
+  
+  # Out
+  Memory Used : True
+  Disk Used : True
+  ```
+
+  Cuando usamos la función caché, usará el nivel de almacenamiento como Memory_Only hasta Spark 2.0.2. Desde Spark 2.1.x en Memory_and_DISK.
+
+- **persist**: si necesitamos especificar los distintos niveles de almacenamiento disponibles.
+
+  ```python
+  from pyspark.storagelevel import StorageLevel
+  
+  deptdf.persist(StorageLevel.MEMORY_ONLY)
+  deptdf.count()
+  print("Memory Used : {0}".format(df.storageLevel.useMemory))
+  print("Disk Used : {0}".format(df.storageLevel.useDisk))
+  
+  # Out
+  Memory Used : True
+  Disk Used : True
+  ```
+
+- **unpersist**: eliminar la memoria caché de los datos.
+
+  ```python
+  df.unpersist()
+  ```
+
+## Expresiones SQL
+
+También podemos usar la expresión SQL para la manipulación de datos. Tenemos la función **expr** y también una variante de un método de selección como **selectExpr** para la evaluación de expresiones SQL.
+
+```python
+from pyspark.sql.functions import expr
+
+# Intentemos categorizar el salario en Bajo, Medio y Alto según la categorización a continuación.
+
+# 0-2000: salario_bajo
+# 2001 - 5000: mid_salary
+#> 5001: high_salary
+
+cond = """case when salary > 5000 then 'high_salary'
+               else case when salary > 2000 then 'mid_salary'
+                    else case when salary > 0 then 'low_salary'
+                         else 'invalid_salary'
+                              end
+                         end
+                end as salary_level"""
+
+newdf = df.withColumn("salary_level", expr(cond))
+newdf.show()
+
+# Out
++----+----+-----+------+------------+
+|  id|name| dept|salary|salary_level|
++----+----+-----+------+------------+
+|   1| AAA|dept1|  1000|  low_salary|
+|   2| BBB|dept1|  1100|  low_salary|
+|   3| CCC|dept1|  3000|  mid_salary|
+|   4| DDD|dept1|  1500|  low_salary|
+|   5| EEE|dept2|  8000| high_salary|
+|   6| FFF|dept2|  7200| high_salary|
+|   7| GGG|dept3|  7100| high_salary|
+|null|null| null|  7500| high_salary|
+|   9| III| null|  4500|  mid_salary|
+|  10|null|dept5|  2500|  mid_salary|
++----+----+-----+------+------------+
+```
+
+- **selectExpr**
+
+  ```python
+  newdf = df.selectExpr("*", cond)
+  newdf.show()
+  
+  # Out
+  +----+----+-----+------+------------+
+  |  id|name| dept|salary|salary_level|
+  +----+----+-----+------+------------+
+  |   1| AAA|dept1|  1000|  low_salary|
+  |   2| BBB|dept1|  1100|  low_salary|
+  |   3| CCC|dept1|  3000|  mid_salary|
+  |   4| DDD|dept1|  1500|  low_salary|
+  |   5| EEE|dept2|  8000| high_salary|
+  |   6| FFF|dept2|  7200| high_salary|
+  |   7| GGG|dept3|  7100| high_salary|
+  |null|null| null|  7500| high_salary|
+  |   9| III| null|  4500|  mid_salary|
+  |  10|null|dept5|  2500|  mid_salary|
+  +----+----+-----+------+------------+
+  ```
+
+## Funciones definidas por el usuario (UDF)
+
+A menudo necesitamos escribir la función en función de nuestro requisito muy específico. Aquí podemos aprovechar las UDFs. Podemos escribir nuestras propias funciones en un lenguaje como Python y registrar la función como UDF, luego podemos usar la función para operaciones de DataFrame.
+
+- Función de Python para encontrar el nivel_salario para un salario dado.
+
+  ```python
+  def detSalary_Level(sal):
+      level = None
+  
+      if (sal > 5000):
+          level = 'high_salary'
+      elif (sal > 2000):
+          level = 'mid_salary'
+      elif (sal > 0):
+          level = 'low_salary'
+      else:
+          level = 'invalid_salary'
+      return level
+  
+  # registre la función como UDF
+  sal_level = udf(detSalary_Level, StringType())
+  
+  # Aplicar función para determinar el salary_level para un salario dado
+  newdf = df.withColumn("salary_level", sal_level("salary"))
+  newdf.show()
+  
+  # Out
+  +----+----+-----+------+------------+
+  |  id|name| dept|salary|salary_level|
+  +----+----+-----+------+------------+
+  |   1| AAA|dept1|  1000|  low_salary|
+  |   2| BBB|dept1|  1100|  low_salary|
+  |   3| CCC|dept1|  3000|  mid_salary|
+  |   4| DDD|dept1|  1500|  low_salary|
+  |   5| EEE|dept2|  8000| high_salary|
+  |   6| FFF|dept2|  7200| high_salary|
+  |   7| GGG|dept3|  7100| high_salary|
+  |null|null| null|  7500| high_salary|
+  |   9| III| null|  4500|  mid_salary|
+  |  10|null|dept5|  2500|  mid_salary|
+  +----+----+-----+------+------------+
+  ```
+
+## Trabajando con valores NULL
+
+- **isNull**: nos ayudará a encontrar los valores nulos para cualquier columna dada.
+
+  ```python
+  newdf = df.filter(df["dept"].isNull())
+  newdf.show()
+  
+  # Out
+  +----+----+----+------+
+  |  id|name|dept|salary|
+  +----+----+----+------+
+  |null|null|null|  7500|
+  |   9| III|null|  4500|
+  +----+----+----+------+
+  ```
+
+- **isNotNull**: funciona de manera opuesta a isNull.
+
+  ```python
+  newdf = df.filter(df["dept"].isNotNull())
+  newdf.show()
+  
+  # Out
+  +---+----+-----+------+
+  | id|name| dept|salary|
+  +---+----+-----+------+
+  |  1| AAA|dept1|  1000|
+  |  2| BBB|dept1|  1100|
+  |  3| CCC|dept1|  3000|
+  |  4| DDD|dept1|  1500|
+  |  5| EEE|dept2|  8000|
+  |  6| FFF|dept2|  7200|
+  |  7| GGG|dept3|  7100|
+  | 10|null|dept5|  2500|
+  +---+----+-----+------+
+  ```
+
+- **fillna**: reemplazar los valores nulos.
+
+  ```python
+  # Replace -1 where the salary is null.
+  newdf = df.fillna("INVALID", ["dept"])
+  newdf.show()
+  
+  # Out
+  +----+----+-------+------+
+  |  id|name|   dept|salary|
+  +----+----+-------+------+
+  |   1| AAA|  dept1|  1000|
+  |   2| BBB|  dept1|  1100|
+  |   3| CCC|  dept1|  3000|
+  |   4| DDD|  dept1|  1500|
+  |   5| EEE|  dept2|  8000|
+  |   6| FFF|  dept2|  7200|
+  |   7| GGG|  dept3|  7100|
+  |null|null|INVALID|  7500|
+  |   9| III|INVALID|  4500|
+  |  10|null|  dept5|  2500|
+  +----+----+-------+------+
+  ```
+
+- **dropna**: eliminar las filas con valores nulos.
+
+  ```python
+  # Remove all rows which contains any null values.
+  newdf = df.dropna()
+  newdf.show()
+  
+  # Out
+  +---+----+-----+------+
+  | id|name| dept|salary|
+  +---+----+-----+------+
+  |  1| AAA|dept1|  1000|
+  |  2| BBB|dept1|  1100|
+  |  3| CCC|dept1|  3000|
+  |  4| DDD|dept1|  1500|
+  |  5| EEE|dept2|  8000|
+  |  6| FFF|dept2|  7200|
+  |  7| GGG|dept3|  7100|
+  +---+----+-----+------+
+  
+  # Elimina todas las filas que contienen todos los valores nulos.
+  newdf = df.dropna(how="all")
+  newdf.show()
+  
+  # Nota: valor predeterminado del param "how" es "any".
+  
+  # Out
+  +---+----+-----+------+
+  | id|name| dept|salary|
+  +---+----+-----+------+
+  |  1| AAA|dept1|  1000|
+  |  2| BBB|dept1|  1100|
+  |  3| CCC|dept1|  3000|
+  |  4| DDD|dept1|  1500|
+  |  5| EEE|dept2|  8000|
+  |  6| FFF|dept2|  7200|
+  |  7| GGG|dept3|  7100|
+  | 10|null|dept5|  2500|
+  +---+----+-----+------+
+  
+  # Remove all rows where columns : dept is null.
+  newdf = df.dropna(subset="dept")
+  newdf.show()
+  
+  # Out
+  +---+----+-----+------+
+  | id|name| dept|salary|
+  +---+----+-----+------+
+  |  1| AAA|dept1|  1000|
+  |  2| BBB|dept1|  1100|
+  |  3| CCC|dept1|  3000|
+  |  4| DDD|dept1|  1500|
+  |  5| EEE|dept2|  8000|
+  |  6| FFF|dept2|  7200|
+  |  7| GGG|dept3|  7100|
+  | 10|null|dept5|  2500|
+  +---+----+-----+------+
+  ```
+
+## Partitioning
+
+El particionamiento es un aspecto muy importante para controlar el paralelismo de la aplicación Spark.
+
+- **getNumPartitions**: Consultar el número de particiones.
+
+  ```python
+  df.rdd.getNumPartitions()
+  
+  # Out
+  16
+  ```
+
+- **repartition**: incrementar o disminuir el número de particiones.
+
+  ```python
+  newdf = df.repartition(6)
+  newdf.rdd.getNumPartitions()
+  
+  # Out
+  6
+  ```
+
+- **coalesce**: Disminuir el número de particiones (más eficiente que repartition).
+
+  ```python
+  newdf = df.coalesce(2)
+  newdf.rdd.getNumPartitions()
+  
+  # Out
+  2
+  ```
+
+De forma predeterminada, el número de particiones para Spark SQL es 200.
+Pero también podemos establecer el número de particiones en el nivel de aplicación Spark. Por ejemplo establecido en 500:
+
+```python
+# Set number of partitions as Spark Application.
+spark.conf.set("spark.sql.shuffle.partitions", "500")
+
+# Check the number of patitions.
+num_part = spark.conf.get("spark.sql.shuffle.partitions")
+print("No of Partitions : {0}".format(num_part))
+
+# Out
+500
+```
+
+## Catálogo de APIs
+
+Spark Catalog es una API orientada al usuario, a la que puede acceder mediante SparkSession.catalog.
+
+- **listDatabases**: Devolverá todas las bases de datos junto con su ubicación en el sistema de archivos.
+
+  ```python
+  spark.catalog.listDatabases()
+  
+  # Out
+  [Database(name='default', description='default database', locationUri='file:/B:/OneDrive/Coding/Python/Courses/PySpark/big-data-apache-spark-3-python-cero-experto/Entrega/spark-warehouse')]
+  ```
+
+- **listTables(<db_name>)**: Devolverá todas las tablas para una base de datos determinada junto con información como el tipo de tabla (externa / administrada) y si una tabla en particular es temporal o permanente. Esto incluye todas las vistas temporales.
+
+  ```python
+  spark.catalog.listTables("default")
+  
+  # Out
+  [Table(name='hive_deptdf', database='default', description=None, tableType='MANAGED', isTemporary=False),
+   Table(name='hive_empdf', database='default', description=None, tableType='MANAGED', isTemporary=False),
+   Table(name='deptdf', database=None, description=None, tableType='TEMPORARY', isTemporary=True),
+   Table(name='empdf', database=None, description=None, tableType='TEMPORARY', isTemporary=True)]
+  ```
+
+- **listColumns**: Devolverá todas las columnas de una tabla en particular en DataBase. Además, devolverá el tipo de datos, si la columna se usa en particiones o agrupaciones.
+
+  ```python
+  spark.catalog.listColumns("hive_empdf", "default")
+  
+  # Out
+  [Column(name='id', description=None, dataType='bigint', nullable=True, isPartition=False, isBucket=False),
+   Column(name='name', description=None, dataType='string', nullable=True, isPartition=False, isBucket=False),
+   Column(name='dept', description=None, dataType='string', nullable=True, isPartition=False, isBucket=False),
+   Column(name='salary', description=None, dataType='bigint', nullable=True, isPartition=False, isBucket=False)]
+  ```
+
+- **listFunctions**: Devolverá todas las funciones disponibles en Spark Session junto con la información de si es temporal o no.
+
+  ```python
+  spark.catalog.listFunctions()
+  
+  # Out
+  ...
+  ```
+
+- **currentDatabase**: Obtenga la base de datos actual.
+
+  ```python
+  spark.catalog.currentDatabase()
+  
+  # Out
+  'default'
+  ```
+
+- **setCurrentDatabase**: Establecer la base de datos actual.
+
+  ```python
+  spark.catalog.setCurrentDatabase('db_name')
+  ```
+
+- **cacheTable**: almacenar en caché una tabla en particular.
+
+  ```python
+  spark.catalog.cacheTable("default.hive_empdf")
+  ```
+
+- **isCached**: Comprueba si la tabla está almacenada en caché o no.
+
+  ```python
+  spark.catalog.isCached("default.hive_empdf")
+  
+  # Out
+  True
+  ```
+
+- **uncacheTable**: Dejar de cachear una tabla en particular.
+
+  ```python
+  # Verify uncached table. Now you will see that it will return "False" which means table is not cached.
+  spark.catalog.isCached("default.hive_empdf")
+  
+  # Out
+  False
+  ```
+
+- **clearCache**: elimina todos los datos almacenados en caché en Spark.
+
+  ```python
+  spark.catalog.clearCache()
+  ```
+
+------
+
+# Analítica avanzada con Spark
+
+## Funciones para analítica de datos
+
+Para poder **entrenar un modelo** o realizar **análisis estadísticos** con nuestros datos son necesarias las siguientes funciones:
+
+- Generar una sesión de Spark
+- Importar datos y generar un **esquema** correcto
+- Métodos para **inspeccionar** datos
+- **Transformación** de datos y de columnas
+- Lidiar con los **valores faltantes**
+- Ejecutar **consultas**
+- **Visualización** de datos
+
+## Visualización de datos
+
+PySpark es compatible con numerosas bibliotecas de visualización de datos de **Python** como seaborn, matplotlib, bokehn, etc.
+
+<img src="assets/image-20230426123945166.png" alt="image-20230426123945166" style="zoom:80%;" />
+
+El CSV con el que se va a trabajar en los ejemplos contiene los datos del precio de las acciones de Estados Unidos desde Enero de 2019 hasta Julio de 2020. Imaginemos que queremos entrenar un modelo de regresión para poder predecir el precio futuro de las acciones de Estados Unidos, en ese caso, no se puede empezar a entrenar el modelo directamente, si no que hay que aplicar una fase de analística avanzada, como se va a ver en los siguientes ejemplos.
+
+## 1. Lectura de los datos
+
+```python
+# Before changing schema
+b_data = spark.read.csv(
+    r'data/stocks_price_final.csv',
+    sep=',',
+    header=True,
+)
+
+b_data.printSchema()
+
+# Out
+root
+ |-- _c0: string (nullable = true)
+ |-- symbol: string (nullable = true)
+ |-- date: string (nullable = true)
+ |-- open: string (nullable = true)
+ |-- high: string (nullable = true)
+ |-- low: string (nullable = true)
+ |-- close: string (nullable = true)
+ |-- volume: string (nullable = true)
+ |-- adjusted: string (nullable = true)
+ |-- market.cap: string (nullable = true)
+ |-- sector: string (nullable = true)
+ |-- industry: string (nullable = true)
+ |-- exchange: string (nullable = true)
+```
+
+### Cambiar la estructura de datos
+
+Hay veces que, al utilizar inferSchema, PySpark no lo hace del todo bien de forma automática. O simplemente, queremos definir nosotros mismos el esquema.
+
+```python
+from pyspark.sql.types import *
+
+data_schema = [
+    StructField('_c0', IntegerType(), True),
+    StructField('symbol', StringType(), True),
+    StructField('data', DateType(), True),
+    StructField('open', DoubleType(), True),
+    StructField('high', DoubleType(), True),
+    StructField('low', DoubleType(), True),
+    StructField('close', DoubleType(), True),
+    StructField('volume', IntegerType(), True),
+    StructField('adjusted', DoubleType(), True),
+    StructField('market.cap', StringType(), True),
+    StructField('sector', StringType(), True),
+    StructField('industry', StringType(), True),
+    StructField('exchange', StringType(), True),
+]
+
+final_struc = StructType(fields=data_schema)
+
+data = spark.read.csv(
+    'data/stocks_price_final.csv',
+    sep=',',
+    header=True,
+    schema=final_struc
+)
+
+data.printSchema()
+
+# Out
+root
+ |-- _c0: integer (nullable = true)
+ |-- symbol: string (nullable = true)
+ |-- data: date (nullable = true)
+ |-- open: double (nullable = true)
+ |-- high: double (nullable = true)
+ |-- low: double (nullable = true)
+ |-- close: double (nullable = true)
+ |-- volume: integer (nullable = true)
+ |-- adjusted: double (nullable = true)
+ |-- market.cap: string (nullable = true)
+ |-- sector: string (nullable = true)
+ |-- industry: string (nullable = true)
+ |-- exchange: string (nullable = true)
+```
+
+También se puede dar el caso de que algún nombre de columna esté definido con un nombre que nos pueda dar problemas en un futuro cuando se trabaje con el DF. Podemos generar con diferentes nombres de columnas utilizando la función **withColumnRenamed('old_column_name', 'new_column_name')**.
+
+```python
+data = data.withColumnRenamed('market.cap', 'market_cap')
+```
+
+## 2. Inspeccionar los datos
+
+- **head(<n_rows>)**: devuelve n filas como una lista.
+
+  ```python
+  data.head(3)
+  
+  # Out
+  [Row(_c0=1, symbol='TXG', data=datetime.date(2019, 9, 12), open=54.0, high=58.0, low=51.0, close=52.75, volume=7326300, adjusted=52.75, market_cap='$9.31B', sector='Capital Goods', industry='Biotechnology: Laboratory Analytical Instruments', exchange='NASDAQ'),
+   Row(_c0=2, symbol='TXG', data=datetime.date(2019, 9, 13), open=52.75, high=54.355, low=49.150002, close=52.27, volume=1025200, adjusted=52.27, market_cap='$9.31B', sector='Capital Goods', industry='Biotechnology: Laboratory Analytical Instruments', exchange='NASDAQ'),
+   Row(_c0=3, symbol='TXG', data=datetime.date(2019, 9, 16), open=52.450001, high=56.0, low=52.009998, close=55.200001, volume=269900, adjusted=55.200001, market_cap='$9.31B', sector='Capital Goods', industry='Biotechnology: Laboratory Analytical Instruments', exchange='NASDAQ')]
+  ```
+
+- **show(<n_rows>)**: Muestra las 20 primeras filas por defecto si no se le pasa el número de filas que queremos mostrar.
+
+  ```python
+  data.show(5)
+  
+  # Out
+  --+--------+
+  |_c0|symbol|      data|     open|     high|      low|    close| volume| adjusted|market_cap|       sector|            industry|exchange|
+  +---+------+----------+---------+---------+---------+---------+-------+---------+----------+-------------+--------------------+--------+
+  |  1|   TXG|2019-09-12|     54.0|     58.0|     51.0|    52.75|7326300|    52.75|    $9.31B|Capital Goods|Biotechnology: La...|  NASDAQ|
+  |  2|   TXG|2019-09-13|    52.75|   54.355|49.150002|    52.27|1025200|    52.27|    $9.31B|Capital Goods|Biotechnology: La...|  NASDAQ|
+  |  3|   TXG|2019-09-16|52.450001|     56.0|52.009998|55.200001| 269900|55.200001|    $9.31B|Capital Goods|Biotechnology: La...|  NASDAQ|
+  |  4|   TXG|2019-09-17|56.209999|60.900002|   55.423|56.779999| 602800|56.779999|    $9.31B|Capital Goods|Biotechnology: La...|  NASDAQ|
+  |  5|   TXG|2019-09-18|56.849998|    62.27|55.650002|     62.0|1589600|     62.0|    $9.31B|Capital Goods|Biotechnology: La...|  NASDAQ|
+  +---+------+----------+---------+---------+---------+---------+-------+---------+----------+-------------+--------------------+--------+
+  only showing top 5 rows
+  ```
+
+- *... El resto de métodos ya han sido vistos anteriormente*.
+
+## 3. Transformación de columnas
+
+- *... Todos los métodos ya han sido vistos anteriormente*.
+
+## 4. Imputando datos faltantes
+
+A menudo encontramos valores perdidos cuando tratamos con datos reales. Estos valores faltantes se codifican como NaN, espacios en blanco y marcadores de posición.
+
+```python
+# Remove Rows with Missing Values
+data.na.drop()
+
+# Replacing Missing Values with Mean
+data.na.fill(data.select(f.mean(data['open'])).collect()[0][0])
+
+# Explanation:
+# data.select(f.mean(data['open'])): Primero, se utiliza la función select() para seleccionar la columna "open" del DataFrame "data" y se calcula su media utilizando la función mean() de PySpark. Esto devuelve un nuevo DataFrame con una sola fila y una sola columna que contiene la media de la columna "open".
+
+# collect()[0][0]: Luego, se utiliza la función collect() para recopilar la única fila del DataFrame anterior en forma de lista. Esta lista tiene un solo elemento, que es la media calculada anteriormente. Por lo tanto, se utiliza [0][0] para acceder a este valor de media en particular.
+
+# data.na.fill(...): Por último, se utiliza la función na.fill() de PySpark en el DataFrame "data" para llenar los valores nulos en la columna "open" con la media calculada anteriormente.
+
+# Replacing Missing Values with new values
+data.na.replace('old_value', 'new_value')
+```
+
+### Imputer
+
+Es un estimador* que completa los valores perdidos en un conjunto de datos utilizando la media, la mediana o la moda de las columnas en las que se encuentran los valores perdidos.
+
+**Un estimador es un algoritmo que se utiliza para entrenar un modelo a partir de los datos. En otras palabras, un estimador es un objeto que se utiliza para configurar y ejecutar el proceso de aprendizaje automático en Spark.
+
+En términos más técnicos, un estimador es una clase en la API de Spark ML (Machine Learning) que implementa un método llamado `fit()`. El método `fit()` toma como entrada un DataFrame y entrena un modelo a partir de los datos contenidos en el DataFrame. El modelo entrenado puede ser utilizado para realizar predicciones en nuevos datos utilizando el método `transform()`.
+
+```python
+# DataFrame
+      a     |      b      
+------------|-----------
+     1.0    | Double.NaN
+     2.0    | Double.NaN
+ Double.NaN |     3.0   
+     4.0    |     4.0   
+     5.0    |     5.0   
+     
+from pyspark.ml.feature import Imputer
+
+df = spark.createDataFrame([
+    (1.0, float("nan")),
+    (2.0, float("nan")),
+    (float("nan"), 3.0),
+    (4.0, 4.0),
+    (5.0, 5.0)
+], ["a", "b"])
+
+imputer = Imputer(inputCols=["a", "b"], outputCols=["out_a", "out_b"])
+model = imputer.fit(df)
+
+model.transform(df).show()
+
+# Out
+      a     |      b     | out_a | out_b   
+------------|------------|-------|-------
+     1.0    | Double.NaN |  1.0  |  4.0 
+     2.0    | Double.NaN |  2.0  |  4.0 
+ Double.NaN |     3.0    |  3.0  |  3.0 
+     4.0    |     4.0    |  4.0  |  4.0
+     5.0    |     5.0    |  5.0  |  5.0 
+```
+
+## 5. Selección de datos con PySpark SQL
+
+- **between**: se utiliza para filtrar filas de un DF basado en una condición de rango. La función `between` devuelve `True` si el valor de la columna especificada se encuentra dentro del rango especificado (incluyendo los límites) y `False` en caso contrario.
+
+  ```python
+  data.filter(data.adjusted.between(100.0, 500.0)).show(5)
+  ```
+
+- **when**: se utiliza para aplicar una lógica condicional a una o varias columnas de un DataFrame y asignar un valor dependiendo si la condición se cumple o no.
+
+  ```python
+  data.select('open', 'close',
+              f.when(data.adjusted >= 200.0, 1).otherwise(0)).show(5)
+              
+  # Out
+  +---------+---------+-----------------------------------------------+
+  |     open|    close|CASE WHEN (adjusted >= 200.0) THEN 1 ELSE 0 END|
+  +---------+---------+-----------------------------------------------+
+  |     54.0|    52.75|                                              0|
+  |    52.75|    52.27|                                              0|
+  |52.450001|55.200001|                                              0|
+  |56.209999|56.779999|                                              0|
+  |56.849998|     62.0|                                              0|
+  +---------+---------+-----------------------------------------------+
+  only showing top 5 rows
+  ```
+
+- **rlike**: se utiliza para buscar un patrón específico en una cadena de texto en una columna de un DataFrame. El patrón es una expresión regular (regex) que define el patrón de búsqueda.
+
+  ```python
+  data.select('sector',
+              data.sector.rlike('^[B,C]').alias('Sector Starting with B or C')
+              ).distinct().show()
+              
+  # Out
+  +--------------------+---------------------------+
+  |              sector|Sector Starting with B or C|
+  +--------------------+---------------------------+
+  |         Health Care|                      false|
+  |       Capital Goods|                       true|
+  |Consumer Non-Dura...|                       true|
+  |    Public Utilities|                      false|
+  |   Consumer Durables|                       true|
+  |             Finance|                      false|
+  |      Transportation|                      false|
+  |       Miscellaneous|                      false|
+  |   Consumer Services|                       true|
+  |              Energy|                      false|
+  |    Basic Industries|                       true|
+  |          Technology|                      false|
+  +--------------------+---------------------------+
+  ```
+
+- **groupBy**: se utiliza para agrupar filas de un DataFrame en función de una o más columnas y luego aplicar una o varias operaciones de agregación a cada grupo.
+
+  ```python
+  data.select(['industry', 'open', 'close', 'adjusted']).groupBy('industry').mean().show()
+  
+  # Out
+  +--------------------+-----------------+------------------+------------------+
+  |            industry|        avg(open)|        avg(close)|     avg(adjusted)|
+  +--------------------+-----------------+------------------+------------------+
+  |Finance/Investors...|5.134401785714288| 5.136630739795919| 4.991354066964286|
+  |       Miscellaneous|16.38588266938775|16.359879090306126|16.148959322959186|
+  |Biotechnology: Bi...|24.80808319232426|24.803587149935417| 24.74507997827317|
+  |Other Specialty S...|84.80718810562857|  84.8027655092983| 84.55525036482354|
+  |Biotechnology: El...|33.36891734535046| 33.33611913546896| 33.21022605613575|
+  +--------------------+-----------------+------------------+------------------+
+  only showing top 5 rows
+  ```
+
+- **agg**: es una función utilizada en conjunto con `groupBy` para aplicar una o varias operaciones de agregación a un DataFrame. Las expresiones de agregación son funciones predefinidas en PySpark, como `count`, `sum`, `mean`, `max`, `min`, entre otras.
+
+  ```python
+  from pyspark.sql.functions import col, min, max, avg, lit
+  
+  data.groupBy("sector") \
+      .agg(min("data").alias("From"),
+           max("data").alias("To"),
+  
+           min("open").alias("Minimum Opening"),
+           max("open").alias("Maximum Opening"),
+           avg("open").alias("Average Opening"),
+  
+           min("close").alias("Minimum Closing"),
+           max("close").alias("Maximum Closing"),
+           avg("close").alias("Average Closing"),
+  
+           min("adjusted").alias("Minimum Adjusted Closing"),
+           max("adjusted").alias("Maximum Adjusted Closing"),
+           avg("adjusted").alias("Average Adjusted Closing"),
+  
+           ).show(truncate=False)
+  ```
+
+  ```python
+  # Example
+  # Obtenga los datos mínimos, máximos y promedio de los sectores de **enero de 2019** a **enero de 2020**
+  
+  data.filter((col('data') >= lit('2019-01-02')) & (col('data') <= lit('2020-01-31'))) \
+      .groupBy("sector") \
+      .agg(
+      	 min("data").alias("From"),
+           max("data").alias("To"),
+  
+           min("open").alias("Minimum Opening"),
+           max("open").alias("Maximum Opening"),
+           avg("open").alias("Average Opening"),
+  
+           min("close").alias("Minimum Closing"),
+           max("close").alias("Maximum Closing"),
+           avg("close").alias("Average Closing"),
+  
+           min("adjusted").alias("Minimum Adjusted Closing"),
+           max("adjusted").alias("Maximum Adjusted Closing"),
+           avg("adjusted").alias("Average Adjusted Closing"),
+  
+           ).show(truncate=False)
+  ```
+
+## 6. Visualización de datos
+
+Para poder visualizar datos en Spark, tenemos que utilizar el método `toPandas()` para pasar a un DF todos los datos. Tenemos que tener en cuenta que si trabajamos con una gran cantidad de datos y tratamos de pasarlos a un DF de Pandas en una única máquina, esto nos puede generar errores de memoria. Por tanto, es recomendable visualizar datos una vez que se hayan agregado.
+
+```python
+sec_df = data.select(['sector', 'open', 'close', 'adjusted']).groupBy('sector').mean().toPandas()
+sec_df
+```
+
+<img src="assets/image-20230426154925217.png" alt="image-20230426154925217" style="zoom:80%;" />
+
+** *Más ejemplos en el jupyter notebook*.
+
+## 7. Leer y guardar datos en archivos
+
+Es muy importante que dejemos persistidos los datos y los cambios que hayamos hecho a nuestro Dataset para poder retomar el trabajo realizado.
+
+```python
+## Writing entire data to different file formats
+
+# CSV
+data.write.csv('dataset.csv')
+
+# JSON
+data.write.save('dataset.json', format='json')
+
+# Parquet
+data.write.save('dataset.parquet', format='parquet')
+
+## Writing selected data to different file formats
+
+# CSV
+data.select(['data', 'open', 'close', 'adjusted']) \
+    .write.csv('dataset.csv')
+
+# JSON
+data.select(['data', 'open', 'close', 'adjusted']) \
+    .write.save('dataset.json', format='json')
+
+# Parquet
+data.select(['data', 'open', 'close', 'adjusted']) \
+    .write.save('dataset.parquet', format='parquet')  #%%
+data.printSchema()
+```
+
+------
+
+# Apacha Spark Koalas
+
+## Introducción a Koalas
+
+Koalas proporciona un **reemplazo directo de Pandas**, lo que permite un escalado eficiente a cientos de nodos para la ciencia de datos y el Machine Learning.
+
+Pandas no se escala a Big Data.
+
+**PySpark DataFrame** es más compatible con **SQL** y **Koalas DataFrame** está más cerca de **Python**.
+
+<img src="assets/image-20230427112009852.png" alt="image-20230427112009852" style="zoom:80%;" />
+
+## Koalas y PySpark DataFrames
+
+Koalas y PySpark DataFrames son diferentes. **Koalas** DataFrames sigue la **estructura de Pandas** e implementa un **índice**. El **PySpark DataFrame** es más compatible con las tablas en las **bases de datos relaciones** y no tiene índices.
+
+Koalas traduce las API de Pandas al plan lógico de **Spark SQL**.
+
+<img src="assets/image-20230427112222426.png" alt="image-20230427112222426" style="zoom:80%;" />
+
+## Ejemplo: Ingeniería de características con Koalas
+
+En ciencia de datos a menudo se necesita de la función de **get_dummies() de Pandas** para codificar variables categóricas como variables ficticias (numéricas).
+
+Gracias a Koalas se puede hacer esto en Spark con solo unos pocos ajustes.
+
+**Pandas**
+
+<img src="assets/image-20230427112403699.png" alt="image-20230427112403699" style="zoom:80%;" />
+
+**Koalas**
+
+<img src="assets/image-20230427112419258.png" alt="image-20230427112419258" style="zoom:80%;" />
+
+![image-20230427112430910](assets/image-20230427112430910.png)
+
+![image-20230427112439744](assets/image-20230427112439744.png)
+
+## Ejemplo: Ingeniería de características con Koalas
+
+En ciencia de datos a menudo se necesita trabajar con **datos de tiempo**. Pandas permite trabajar con este tipo de datos de forma fácil, en PySpark es más complicado.
+
+**Pandas**
+
+<img src="assets/image-20230427112729310.png" alt="image-20230427112729310" style="zoom:80%;" />
+
+**Koalas**
+
+<img src="assets/image-20230427112840215.png" alt="image-20230427112840215" style="zoom:80%;" />
+
+![image-20230427112845837](assets/image-20230427112845837.png)
+
+![image-20230427112849214](assets/image-20230427112849214.png)
+
+## 1. Creación de objetos
+
+- **Series**: representa una columna de un DataFrame y proporciona muchas funcionalidades para manipular, transformar y analizar los datos contenidos en ella.
+
+  ```python
+  s = ks.Series([1, 3, 5, np.nan, 6, 8])
+  ```
+
+  <img src="assets/image-20230427125939210.png" alt="image-20230427125939210" style="zoom:80%;" />
+
+- **DataFrame**: es una estructura de datos que representa una tabla rectangular de datos con filas y columnas etiquetadas. Además, los datos de un DataFrame en Koalas se distribuyen en varias particiones y se procesan en paralelo, lo que permite trabajar con grandes conjuntos de datos y aprovechar el potencial de la computación distribuida en clústeres.
+
+  ```python
+  kdf = ks.DataFrame(
+      {'a': [1, 2, 3, 4, 5, 6],
+       'b': [100, 200, 300, 400, 500, 600],
+       'c': ["one", "two", "three", "four", "five", "six"]},
+      index=[10, 20, 30, 40, 50, 60])
+  ```
+
+  <img src="assets/image-20230427130032578.png" alt="image-20230427130032578" style="zoom:80%;" />
+
+- **date_range (de Pandas)**: se utiliza para generar una secuencia de fechas.
+
+  ```python
+  dates = pd.date_range('20130101', periods=6)
+  
+  # Out
+  DatetimeIndex(['2013-01-01', '2013-01-02', '2013-01-03', '2013-01-04',
+                 '2013-01-05', '2013-01-06'],
+                dtype='datetime64[ns]', freq='D')
+  ```
+
+- **from_pandas (de Koalas)**: se utiliza para crear un objeto Koalas DataFrame a partir de un objeto Pandas DataFrame (pero se ve y se comporta como un DataFrame de Pandas).
+
+  ```python
+  pdf = pd.DataFrame(np.random.randn(6, 4), index=dates, columns=list('ABCD'))
+  kdf = ks.from_pandas(pdf)
+  ```
+
+- **createDataFrame(<data>)**: permite crear un DataFrame a partir de diferentes tipos de datos y estructuras, como listas, diccionarios, RDDs, pandas DataFrames, entre otros.
+
+  ```python
+  spark = SparkSession.builder.getOrCreate()
+  sdf = spark.createDataFrame(pdf)
+  
+  # Out
+  +-------------------+--------------------+-------------------+--------------------+
+  |                  A|                   B|                  C|                   D|
+  +-------------------+--------------------+-------------------+--------------------+
+  | 0.7821812376306791|  1.5610120866499508|0.41084488738945946|  0.7236737771474189|
+  |-1.0691913868131395|  2.0639362451398324| 0.9959679441175036|   1.340934944903627|
+  | -2.143607781674943|  1.3639139859258136|-0.8821316142367005|  0.8372436718492526|
+  |  1.314554006084135|-0.08445918861182933|0.25954690193030433| -1.2457420715961245|
+  |-1.3651083501150043|   1.045862077220967| 0.7071005819221372|-0.15400317814980163|
+  | -1.819903879710413|  0.5928358226785815| 0.1514616541958605| -1.1552653517201044|
+  +-------------------+--------------------+-------------------+--------------------+
+  ```
+
+- **to_koalas()**: se utiliza para convertir un DataFrame de PySpark en un DataFrame de Koalas.
+
+  ```python
+  kdf = sdf.to_koalas()
+  ```
+
+## 2. Manipulación de datos
+
+A diferencia de Pandas, los datos en un DataFrame de Spark no están ordenados. 
+
+- **head**: es utilizado para mostrar las primeras filas de un DataFrame de Koalas.
+
+  ```python
+  kdf.head()
+  ```
+
+- **index**: se refiere al índice de las filas en un DataFrame, al igual que en Pandas.
+
+  ```python
+  kdf.index
+  
+  # Out
+  Int64Index([0, 1, 2, 3, 4, 5], dtype='int64')
+  ```
+
+- **columns**: devuelve una lista con los nombres de las columnas del DataFrame.
+
+  ```python
+  kdf.columns
+  
+  # Out
+  Index(['A', 'B', 'C', 'D'], dtype='object')
+  ```
+
+- **to_numpy**: se utiliza para convertir un objeto DataFrame (de Koalas o Pandas) en un arreglo NumPy.
+
+  ```python
+  kdf.to_numpy()
+  
+  # Out
+  array([[ 0.78218124,  1.56101209,  0.41084489,  0.72367378],
+         [-1.06919139,  2.06393625,  0.99596794,  1.34093494],
+         [-2.14360778,  1.36391399, -0.88213161,  0.83724367],
+         [ 1.31455401, -0.08445919,  0.2595469 , -1.24574207],
+         [-1.36510835,  1.04586208,  0.70710058, -0.15400318],
+         [-1.81990388,  0.59283582,  0.15146165, -1.15526535]])
+  ```
+
+- **describe**: es utilizado en pandas y en Koalas para generar estadísticas descriptivas de un DataFrame o una Serie.
+
+  ```python
+  kdf.describe()
+  ```
+
+  <img src="assets/image-20230427132536484.png" alt="image-20230427132536484" style="zoom:80%;" />
+
+- **T**: se utiliza en pandas y Koalas para transponer un DataFrame, es decir, intercambiar filas y columnas. Esto significa que las filas se convierten en columnas y las columnas se convierten en filas.
+
+  ```python
+  kdf.T
+  ```
+
+  <img src="assets/image-20230427132640998.png" alt="image-20230427132640998" style="zoom:80%;" />
+
+- **sort_index**: es un método en pandas y Koalas que se utiliza para ordenar un DataFrame o una Serie por sus índices. Por defecto, ordena en orden ascendente, pero se puede cambiar a descendente utilizando el argumento `ascending=False`.
+
+  ```python
+  kdf.sort_index(ascending=False)
+  ```
+
+  <img src="assets/image-20230427132825847.png" alt="image-20230427132825847" style="zoom:80%;" />
+
+- **sort_values**: se utiliza para ordenar un DataFrame o una Serie según los valores de una o más columnas. Puede tomar varios argumentos, incluyendo `by` (la(s) columna(s) a ordenar), `ascending` (indicando si la ordenación debe ser ascendente o descendente), y `na_position` (indicando dónde se deben colocar los valores NaN). Por defecto, `sort_values()` ordena en orden ascendente y coloca los valores NaN al final.
+
+  ```python
+  kdf.sort_values(by='B')
+  ```
+
+<img src="assets/image-20230427133015574.png" alt="image-20230427133015574" style="zoom:80%;" />
+
+## 3. Datos faltantes
+
+Koalas utiliza principalmente el valor `np.nan` para representar los datos faltantes. Por defecto, no se incluye en los cálculos.
+
+```python
+pdf1 = pdf.reindex(index=dates[0:4], columns=list(pdf.columns) + ['E'])
+pdf1.loc[dates[0]:dates[1], 'E'] = 1
+kdf1 = ks.from_pandas(pdf1)
+kdf1
+```
+
+<img src="assets/image-20230427140146692.png" alt="image-20230427140146692" style="zoom:80%;" />
+
+- **dropna**: Para eliminar las filas que tienen datos faltantes.
+
+  ```python
+  kdf1.dropna(how='any')
+  ```
+
+  <img src="assets/image-20230427140210639.png" alt="image-20230427140210639" style="zoom:80%;" />
+
+- **fillna**: Para llenar los datos faltantes.
+
+  ```python
+  kdf1.fillna(value=5)
+  ```
+
+  <img src="assets/image-20230427140225191.png" alt="image-20230427140225191" style="zoom:80%;" />
+
+## 4. Operaciones
+
+Las operaciones en general excluyen los datos faltantes.
+
+Realización de una estadística descriptiva:
+
+```python
+kdf.mean()
+
+# Out
+A   -0.716846
+B    1.090517
+C    0.273798
+D    0.057807
+dtype: float64
+```
+
+### Configuraciones de Spark
+
+Varias configuraciones en PySpark se pueden aplicar internamente en Koalas.
+Por ejemplo, puede habilitar la optimización de Arrow para acelerar enormemente la conversión de Pandas internos.
+
+```python
+prev = spark.conf.get("spark.sql.execution.arrow.enabled")  # Keep its default value.
+ks.set_option("compute.default_index_type", "distributed")  # Use default index prevent overhead.
+
+import warnings
+warnings.filterwarnings("ignore")  # Ignore warnings coming from Arrow optimizations.
+
+spark.conf.set("spark.sql.execution.arrow.enabled", True)
+%timeit ks.range(300000).to_pandas()
+# Out
+83.2 ms ± 21.9 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+
+spark.conf.set("spark.sql.execution.arrow.enabled", False)
+%timeit ks.range(300000).to_pandas()
+# Out
+555 ms ± 8.99 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+
+ks.reset_option("compute.default_index_type")
+spark.conf.set("spark.sql.execution.arrow.enabled", prev)  # Set its default value back.
+```
+
+### Agrupación
+
+Por "agrupar por" nos referimos a un proceso que involucra uno o más de los siguientes pasos:
+
+- Dividir los datos en grupos según algunos criterios.
+- Aplicar una función a cada grupo de forma independiente
+- Combinar los resultados en una estructura de datos
+
+```python
+kdf = ks.DataFrame({'A': ['foo', 'bar', 'foo', 'bar',
+                          'foo', 'bar', 'foo', 'foo'],
+                    'B': ['one', 'one', 'two', 'three',
+                          'two', 'two', 'one', 'three'],
+                    'C': np.random.randn(8),
+                    'D': np.random.randn(8)})
+```
+
+Agrupar y luego aplicar el **sum** a los grupos resultantes.
+
+<img src="assets/image-20230427145918234.png" alt="image-20230427145918234" style="zoom:80%;" />
+
+```python
+kdf.groupby(['A', 'B']).sum()
+```
+
+<img src="assets/image-20230427150045346.png" alt="image-20230427150045346" style="zoom:80%;" />
+
+## 5. Visualización de datos: Generar gráficos
+
+```python
+pser = pd.Series(np.random.randn(1000),
+                 index=pd.date_range('1/1/2000', periods=1000))
+kser = ks.Series(pser)
+kser = kser.cummax()
+kser
+```
+
+- **cummax**: se utiliza para calcular el valor acumulado máximo de una secuencia de datos en una serie o un marco de datos distribuido en clústeres.
+
+### Gráficos de matplotlib
+
+...
+
+------
+
+# El resto de la documentación, se puede encontrar en los Jupyter Notebooks adjuntos en el proyecto.
