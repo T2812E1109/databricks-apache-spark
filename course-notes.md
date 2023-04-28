@@ -2006,6 +2006,130 @@ kser
 
 ...
 
+## El resto de ejemplos se encuentran en el Jupyter Notebook 6. Apache Spark Koalas.ipynb
+
 ------
 
-# El resto de la documentación, se puede encontrar en los Jupyter Notebooks adjuntos en el proyecto.
+# Machine Learning con Spark
+
+## Spark Machine Learning
+
+**Machine Learning**: es la construcción de **algoritmos** que puede aprender de los datos y hacer predicciones sobre ellos.
+
+**Spark MLlib** se usar para realizar aprendizaje automático en Apache Spark. MLlib consta de algoritmos y funciones habituales.
+
+Dentro del Machine Learning tendríamos 3 categorías diferentes:
+
+- **Aprendizaje supervisado**: Donde tenemos que darle un conjunto de variables de entrada y una variable de salida que es clase que pretendemos predecir.
+- **Aprendizaje no supervisado**: Se utiliza para extraer inferencias de conjuntos de datos y no le damos datos que ya estén etiquetados.
+- **Aprendizaje por refuerzo**: Es un tipo de modelo en el que le damos retroalimentación en términos de recompensas y castigos y va aprendiendo en base a esa retroalimentación.
+
+<img src="assets/image-20230427175435617.png" alt="image-20230427175435617" style="zoom:80%;" />
+
+## Herramientas Spark Machine Learning
+
+Herramientas de MLlib:
+
+- **spark.mllib**: contiene la API original construida sobre RDD (está cayendo en desuso).
+- **spark.ml**: proporciona una API de nivel superior construida sobre DataFrames para construcción de pipelines de ML. La API de ML principal.
+
+<img src="assets/image-20230427180057548.png" alt="image-20230427180057548" style="zoom:80%;" />
+
+## Componentes Spark Machine Learning
+
+**Spark MLlib** proporciona las siguientes herramientas:
+
+- **Algoritmos ML**: Incluyen algoritmos de aprendizaje comunes como clasificación, regresión, agrupamiento y filtrado colaborativo.
+- **Caracterización**: Incluye: extracción, transformación, reducción de dimensionalidad y selección de características.
+- **Pipelines**: son herramientas para construir modelos de ML en etapas.
+- **Persistencia**: permite guardar y cargar algoritmos, modelos y pipelines.
+- **Utilidades**: para álgebra lineal, estadística y manejo de datos.
+
+<img src="assets/image-20230427180517907.png" alt="image-20230427180517907" style="zoom:80%;" />
+
+## Proceso de Machine Learning
+
+<img src="assets/image-20230427180754606.png" alt="image-20230427180754606" style="zoom:80%;" />
+
+- **Etapa 1, Desarrollo del ETL**: Extracción, transformación y carga de los datos con los que se va a entrenar el modelo. Podemos utilizar RDDs o datos estructurados importados en nuestro entorno de Spark.
+- **Etapa 2, Exploración**: Ya tenemos un DataFrame o un Dataset sobre el que podemos aplicar diferentes funciones para analizar esos datos, identificar transformaciones requeridas, analizar datos faltantes, etc.
+- **Etapa 3, Machine Learning**: Ya podemos empezar a desarrollar el modelo de Machine Learning:
+  - Lo primero sería el preprocesamiento de datos, que se compone de la ingeniería de características, donde se van a transformar los datos para que tengan una distribución y unas características adecuadas para poder entrenar el modelo y de la selección de características, en la que haríamos la selección de aquellas características que más nos aportan para predecir.
+  - Una vez que hemos preprocesado los datos, ya podemos empezar a entrenar diferentes modelos.
+- **Etapa 4, Guardado del modelo**: Se guarda el modelo y se despliega en producción una vez que hayamos evaluado el modelo y veamos que los resultados son buenos.
+
+## Ingenierías de características con Spark
+
+Las técnicas de preprocesamiento de datos más utilizadas en los enfoques de Spark son las siguiente:
+
+- **VectorAssembler:** VectorAssembler es una transformación de Spark ML que se utiliza para combinar varias columnas en un solo vector de características. Es especialmente útil cuando se trabaja con conjuntos de datos que contienen varias columnas de características y se desea entrenar un modelo que tome todas esas características en cuenta. El VectorAssembler toma una lista de nombres de columnas y devuelve una sola columna que contiene vectores de características.
+- **Agrupamiento:** El agrupamiento en Spark ML es una técnica que se utiliza para dividir un conjunto de datos en grupos o clústeres de acuerdo con alguna medida de similitud entre los datos. La agrupación es útil para descubrir patrones o relaciones en los datos, y se puede utilizar para segmentar clientes, detectar anomalías o identificar grupos de productos similares. En Spark ML, se pueden utilizar varios algoritmos de agrupamiento, como k-means o bisecting k-means.
+- **Escalado y normalización:** La escala y normalización son técnicas que se utilizan para ajustar los datos a un rango específico o para hacer que los datos tengan una distribución normal. El escalado es útil cuando se trabaja con características que tienen diferentes escalas o magnitudes, mientras que la normalización es útil cuando se desea ajustar la distribución de las características. En Spark ML, se pueden utilizar transformadores como MinMaxScaler o StandardScaler para realizar escalas y normalizaciones.
+- **Trabajar con características categóricas:** Las características categóricas son aquellas que toman valores discretos en lugar de continuos. Por ejemplo, el género, el color o la marca de un producto. En Spark ML, se pueden utilizar transformadores como StringIndexer y OneHotEncoder para codificar características categóricas en valores numéricos que se puedan utilizar en los algoritmos de aprendizaje automático.
+- **Transformadores de datos de texto:** Los datos de texto a menudo se procesan de manera diferente a los datos numéricos. Los transformadores de datos de texto en Spark ML se utilizan para convertir datos de texto en vectores de características numéricas que se pueden utilizar en los algoritmos de aprendizaje automático. Algunos de los transformadores de texto en Spark ML incluyen Tokenizer, StopWordsRemover y CountVectorizer.
+- **Manipulación de funciones:** La manipulación de funciones en Spark ML se utiliza para crear nuevas características a partir de las características existentes. Por ejemplo, se pueden crear nuevas características combinando características existentes o extrayendo características a partir de características de texto o de fecha. En Spark ML, se pueden utilizar transformadores como VectorAssembler, SQLTransformer y RegexTokenizer para realizar manipulaciones de funciones.
+- **PCA:** La PCA (Análisis de Componentes Principales) es una técnica de reducción de dimensionalidad que se utiliza para reducir la complejidad de los conjuntos de datos mediante la eliminación de características redundantes o irrelevantes. En Spark ML, se puede utilizar la clase PCA para realizar PCA en conjuntos de datos con varias características y reducir la dimensionalidad a un número menor de características que aún retienen la información esencial de los datos.
+
+------
+
+# Spark Streaming
+
+## Fundamentos Spark Streaming
+
+**PySpark Streaming** es un sistema escalable y tolerante a fallos que sigue el paradigma de **lotes RDD**.
+
+Opera en intervalos de lotes, recibiendo un **flujo de datos de entrada continuo** de fuentes como Apache Flume, Kinesis, Kafka, sockets TCP, etc.
+
+**Spark Engine** se encarga de procesarlos.
+
+<img src="assets/image-20230427221517640.png" alt="image-20230427221517640" style="zoom:80%;" />
+
+<img src="assets/image-20230427221524247.png" alt="image-20230427221524247" style="zoom:80%;" />
+
+Lo que hace es procesar datos que llegan cada poco tiempo (es decir, en streaming). El mecanismo se funcionamiento es el siguiente:
+
+1. Spark Streaming recibe un flujo de datos constante de diferentes fuentes de datos.
+2. Estos datos transmitidos, se dividen internamente en varios lotes más pequeños según el intervalo de lotes y se envían al motor de Spark.
+3. Este, procesa los datos utilizando algoritmos complejos expresados en funciones de alto nivel (map, reduce, join, ...).
+4. Una vez se terminan de procesar los lotes, se guardan en base de datos, sistemas de archivos, o diferentes formas de persistencia.
+
+## Funcionamiento Spark Streaming
+
+**Spark Streaming** recibe datos de varias fuentes y los agrupa en pequeños lotes (**Dstreams**) en un intervalo de tiempo. El usuario puede definir el **intervalo**. Cada lote de entrada forma un RDD y se procesa mediante trabajos de Spark para crear otros RDD.
+
+<img src="assets/image-20230427222001699.png" alt="image-20230427222001699" style="zoom:80%;" />
+
+<img src="assets/image-20230427222008831.png" alt="image-20230427222008831" style="zoom:80%;" />
+
+## Ejemplo: contar palabras
+
+<img src="assets/image-20230427222242338.png" alt="image-20230427222242338" style="zoom:100%;" />
+
+[Structured Streaming Programming Guide - Spark 3.4.0 Documentation (apache.org)](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html#quick-example)
+
+## Modos de salida
+
+Spark usa varios modos de salida para almacenar los datos:
+
+- **Modo completo (Complete)**: toda la tabla se almacenará
+- **Modo de adición (Append)**: solo las nuevas filas del último proceso se almacenará. Solo para las consultas en las que no se espera que cambien las filas existentes.
+- **Modo de actualización (Update)**: solo las filas que se actualizaron desde el último proceso se almacenarán. Este modo solo genera las filas que han cambiado desde el último proceso. Si la consulta no contiene agregaciones, será equivalente al modo append.
+
+![image-20230427223914400](assets/image-20230427223914400.png)
+
+## Tipos de transformaciones
+
+Para tolerancia a fallos los datos recibidos se copian en dos nodos y hay también un mecanismo llamado checkpointing. Las transformaciones se pueden agrupar en:
+
+- **sin estado**: no depende de los datos de lotes anteriores.
+- **con estado**: utilizan datos de lotes anteriores.
+
+<img src="assets/image-20230427224220582.png" alt="image-20230427224220582" style="zoom:80%;" />
+
+## Caso práctico_Operaciones con ventanas temporales en Spark Streaming
+
+Se puede ver en el Jupyter Notebook "7. Fundamentos de Spark Streaming.ipynb".
+
+## Caso práctico_Detección del fraude bancario en tiempo real
+
+Se puede ver en el Jupyter Notebook "7. Fundamentos de Spark Streaming.ipynb".
